@@ -1,0 +1,139 @@
+慕课网之探秘Spring AOP
+https://www.imooc.com/learn/869
+
+
+慕课网---探秘Spring AOP---视频后代码
+网址：https://www.imooc.com/learn/869
+  AOP是一种编程范式，不是编程语言
+  解决特定问题，不是解决所有问题
+  AOP的初衷
+  DRY:Don't Repeat Yourself
+  soC: Separation of Concerns
+  水平分离：展示层--->服务层--->持久层
+  垂直分离：模块划分（订单，库存等）
+  切面分离：分离功能性需求和非功能性需求
+  AOP应用场景
+    权限控制
+    缓存控制
+    事务控制
+    审计日志
+    性能监控
+    分布式追踪
+    异常处理
+
+支持AOP的编程语言
+    Java， Python，C/C++ ,Ruby, PHP .net
+
+    1，产品管理服务
+    2，产品添加/删除的操作智能管理员才能进行
+    3，普通实现VSAOP实现
+
+
+
+
+
+    expression---->designators --->executions() 匹配方法
+                               筛选有指定注解的 @target()
+                                               @args()
+                                               @within()
+                                               @annotation()
+                                筛选包/类型   within()
+                                筛选对象 this()
+                                         bean()
+                                         target()
+
+                                 筛选(匹配)参数args()
+
+                    指示器
+
+                                    ...
+
+              ---->wildcards--->    *（匹配任意数量的字符）
+                                    ..(一般用于匹配任意数的子包或参数）
+                                    + (匹配指定类及其子类)
+              ---->operators --->  && 与操作符
+                                   || 或操作符
+                                    !
+
+ 5种Advice注解
+ 1,@Before，前置通知
+ 2,@After(finally),后置通知，方法执行完之后
+ 3,@AfterReturning,返回通知，成功执行之后
+ 4,@AfterThrowing,异常通知，抛出异常之后
+ 5,@Around,环绕通知
+
+原理概述：织入机理
+1,编译期(AspectJ)
+2,类加载时(AspectJ 5+)
+3,运行时(Spring AOP)
+
+
+JDK只能针对有接口的类的接口方法进行代理
+Cglib基于继承来实现代理，无法对static，final类进行代理，
+Cglib基于继承来实现代理，无法对private,static类进行代理，
+
+public static Object getProxy(Class clz,MethodInterceptor interceptor) {
+    Enhancer enhancer = new Enhancer();
+    //生成指定类对象的子类，也就是重写类中的业务函数
+    enhancer.setSuperclass(clz);
+    //这里是回调函数，加入intercept()函数
+    enhancer.setCallback(interceptor);//new DemoMethodInterceptor()
+    //创建这个子类对象
+    Subject subject1 = (Subject) enhancer.create();
+    subject1.request();
+}
+
+class DemoMethodInterceptor implements MethodInterceptor {
+    @Override
+    public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+        System.out.println("before in cglib");
+        Object result = null;
+        try {
+            result = methodProxy.invokeSuper(o, objects);
+        } catch (Exception e) {
+            System.out.println("get ex: " + e.getMessage());
+        } finally {
+            System.out.println("after in cglib");
+        }
+        return result;
+    }
+}
+public static void main(String[] args) {
+    Subject subject =(Subecjt) getProxy(RealSubject.calss, new DemoMethodInterceptor());
+    subejct.request();
+}
+
+Spring 如何创建代理bean
+
+AbstractAutoProxyCreator      ProxyFactory      ProxyCreatorSupport         DefaultAopProxyFactory
+    wrapIfNecessary
+    createProxy
+        getProxy----------->createAopProxy--------->createAopProxy
+
+
+public class DefaultAopProxyFactory implements AopProxyFactory, Serializable {
+    public DefaultAopProxyFactory() {
+    }
+
+    public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
+        if (!config.isOptimize() && !config.isProxyTargetClass() && !this.hasNoUserSuppliedProxyInterfaces(config)) {
+            return new JdkDynamicAopProxy(config);
+        } else {
+            Class<?> targetClass = config.getTargetClass();
+            if (targetClass == null) {
+                throw new AopConfigException("TargetSource cannot determine target class: Either an interface or a target is required for proxy creation.");
+            } else {
+                //如果目标对象实现了接口，则默认采用JDK动态代理
+                //如果目标对象没有实现了接口，则采用cglib动态代理
+                //如果目标对象实现了接口，且强制采用cglib代理，则使用cglib动态代理
+                return (AopProxy)(!targetClass.isInterface() && !Proxy.isProxyClass(targetClass) ? new ObjenesisCglibAopProxy(config) : new JdkDynamicAopProxy(config));
+            }
+        }
+    }
+
+    private boolean hasNoUserSuppliedProxyInterfaces(AdvisedSupport config) {
+        Class<?>[] ifcs = config.getProxiedInterfaces();
+        return ifcs.length == 0 || ifcs.length == 1 && SpringProxy.class.isAssignableFrom(ifcs[0]);
+    }
+}
+
